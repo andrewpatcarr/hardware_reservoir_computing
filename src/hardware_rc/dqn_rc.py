@@ -22,24 +22,19 @@ OPENBLAS_NUM_THREADS=1
 NUMEXPR_NUM_THREADS=1
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-# from matplotlib.colormap import get_cmap
-from IPython import display
+
 import gymnasium as gym
 from collections import deque
 
 
 from dataclasses import dataclass, asdict, replace, field
 from typing import Any, Mapping, Optional, List
-from datetime import datetime
 import wandb
 import time
 import json
 import os
 
 import tempfile
-
 
 from ray.air import session
 
@@ -49,7 +44,6 @@ from datetime import datetime
 
 import jax
 import jax.numpy as jnp
-from functools import partial
 
 from .reservoir import Reservoir
 
