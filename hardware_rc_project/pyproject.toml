@@ -22,3 +22,9 @@ classifiers = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hardware_rc"]
+
+[project.optional-dependencies]
+docs = [
+  "sphinx>=8,<9",
+  "furo",
+]
