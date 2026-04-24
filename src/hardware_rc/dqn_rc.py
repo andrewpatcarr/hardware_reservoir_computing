@@ -51,7 +51,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from reservoir import Reservoir
+from .reservoir import Reservoir
 
 
 
@@ -745,7 +745,7 @@ class DQN_RC:
     def save_reservoir(self, path_npz):
         self.hparams = {
             'algorithm': 'DQN_RC',
-            'environment': self.env.unwrapped.spec.id if self.env_name is not 'tron' else 'tron',
+            'environment': self.env.unwrapped.spec.id if self.env_name != 'tron' else 'tron',
         }
         self.hparams.update(asdict(self.config)) # Convert dataclass fields to dict and update hparams
         meta = json.dumps(self.hparams)

@@ -36,7 +36,17 @@ docs = [
   "sphinx-autodoc-typehints",
   "myst-parser",
   "sphinx-copybutton",
+  
+]
+
+viz = [
   "matplotlib",
   "pillow",
   "ipython",
+]
+
+train = [
+  "wandb",
+  "ray[tune]",
+  "pandas",
 ]

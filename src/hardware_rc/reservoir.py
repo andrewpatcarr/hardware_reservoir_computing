@@ -23,12 +23,12 @@ import jax.numpy as jnp
 from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
-import time
+
 import os
 
 from PIL import Image, ImageDraw, ImageFont
 from IPython.display import HTML, display
-import base64
+
 from io import BytesIO
 
 class Reservoir:
