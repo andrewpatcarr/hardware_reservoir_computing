@@ -29,18 +29,12 @@ from collections import deque
 
 from dataclasses import dataclass, asdict, replace, field
 from typing import Any, Mapping, Optional, List
-import wandb
+
 import time
 import json
 import os
 
 import tempfile
-
-from ray.air import session
-
-from ray.train import Checkpoint
-from ray.air.integrations.wandb import WandbLoggerCallback, wandb
-from datetime import datetime
 
 import jax
 import jax.numpy as jnp
@@ -517,6 +511,18 @@ class DQN_RC:
               ray_on=False, ray_metric='avg_reward', ray_mode='max',
               ray_report_freq=1, full_validate=True, val_size_min=1, threed_it=False):
         self.env_name = meta['env'] if 'env' in meta else 'unknown_env'
+        
+        if ray_on:
+            try:
+                from ray.air import session
+                from ray.train import Checkpoint
+                from ray.air.integrations.wandb import WandbLoggerCallback, wandb
+            except:
+                session = None
+                Checkpoint = None
+                WandbLoggerCallback = None
+                wandb = None
+        
         if env is not None:
             self.env = env
         if trials is None:
