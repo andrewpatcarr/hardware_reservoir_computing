@@ -518,10 +518,12 @@ class DQN_RC:
                 from ray.train import Checkpoint
                 from ray.air.integrations.wandb import WandbLoggerCallback, wandb
             except:
+                print("Ray is not installed. Please install ray to use ray features.")
                 session = None
                 Checkpoint = None
                 WandbLoggerCallback = None
                 wandb = None
+                ray_on = False
         
         if env is not None:
             self.env = env
