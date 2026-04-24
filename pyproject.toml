@@ -20,6 +20,8 @@ dependencies = [
   "numpy",
   "jax",
   "gymnasium",
+  "matplotlib",
+  "matplotlib.pyplot",
 ]
 
 [project.urls]
@@ -40,7 +42,6 @@ docs = [
 ]
 
 viz = [
-  "matplotlib",
   "pillow",
   "ipython",
 ]

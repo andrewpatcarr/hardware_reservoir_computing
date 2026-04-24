@@ -49,5 +49,17 @@ intersphinx_mapping = {
 }
 
 autodoc_mock_imports = [
-    
+    "PIL",
+    "PIL.Image",
+    "PIL.ImageDraw",
+    "PIL.ImageFont",
+    "IPython",
+    "IPython.display",
+    "wandb",
+    "ray",
+    "ray.tune",
+    "ray.air",
+    "ray.train",
+    "ray.tune.schedulers",
+    "ray.air.integrations.wandb",
 ]
