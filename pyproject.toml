@@ -21,7 +21,6 @@ dependencies = [
   "jax",
   "gymnasium",
   "matplotlib",
-  "matplotlib.pyplot",
 ]
 
 [project.urls]
