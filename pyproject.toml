@@ -18,6 +18,8 @@ classifiers = [
 ]
 dependencies = [
   "numpy",
+  "jax",
+  "gymnasium",
 ]
 
 [project.urls]
@@ -34,4 +36,7 @@ docs = [
   "sphinx-autodoc-typehints",
   "myst-parser",
   "sphinx-copybutton",
+  "matplotlib",
+  "pillow",
+  "ipython",
 ]
