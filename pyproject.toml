@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hardware_rc"
-version = "0.2.2"
+version = "0.2.3"
 authors = [
   { name="Andrew Carr", email="andrewcarr319@gmail.com" },
 ]
@@ -21,6 +21,7 @@ dependencies = [
   "jax",
   "gymnasium",
   "matplotlib",
+  "Pillow",
 ]
 
 [project.urls]

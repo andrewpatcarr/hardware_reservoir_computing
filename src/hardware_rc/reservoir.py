@@ -26,8 +26,7 @@ import matplotlib.pyplot as plt
 
 import os
 
-from PIL import Image, ImageDraw, ImageFont
-from IPython.display import HTML, display
+from PIL import Image
 
 from io import BytesIO
 
