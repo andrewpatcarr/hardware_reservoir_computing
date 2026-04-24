@@ -55,7 +55,7 @@ from functools import partial
 
 import pandas as pd
 
-from reservoir_sim.reservoir import Reservoir
+from reservoir import Reservoir
 
 
 

@@ -27,4 +27,8 @@ packages = ["src/hardware_rc"]
 docs = [
   "sphinx>=8,<9",
   "furo",
+  "sphinx-rtd-theme",
+  "sphinx-autodoc-typehints",
+  "myst-parser",
+  "sphinx-copybutton",
 ]

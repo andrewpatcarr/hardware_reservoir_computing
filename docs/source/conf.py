@@ -45,3 +45,15 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
 
+autodoc_mock_imports = [
+    "jax",
+    "jax.numpy",
+    "gymnasium",
+    "wandb",
+    "ray",
+    "ray.tune",
+    "ray.air",
+    "IPython",
+    "matplotlib",
+    "PIL",
+]
