@@ -41,46 +41,72 @@ import jax.numpy as jnp
 
 from .reservoir import Reservoir
 
-
+### Normalization factor and offset presets for different environments, can be expanded as needed
+NORM_PRESETS = {
+    "CartPole-v1": {
+        "factor": [4.8*2,3+4,2*0.418,2+4],
+        "offset": [4.8,4,0.5,4]
+    },
+    "CartPole-v0": {
+        "factor": [4.8*2,3+4,2*0.418,2+4],
+        "offset": [4.8,4,0.5,4]
+    },
+    "LunarLander-v3": {
+        "factor": [ 2*2.5, 2*2.5, 2*10.0, 2*10.0, 2*6.2831855, 2*10.0, 2*1.0, 2*1.0 ],
+        "offset": [ 2.5, 2.5, 10.0, 10.0, 6.2831855, 10.0, 1.0, 1.0 ]
+    },
+    "MountainCar-v0": {
+        "factor": [2*1.2, 2*0.07],
+        "offset": [1.2, 0.07]
+    },
+}
 
 @dataclass(frozen=True)
 class DQNConfig:
     # ---- model/solver ---
     # DEFAULT HYPERPARAMETERS
+    env_name: str = "default_env"
 
     rc_seed: int = 1
     mask_seed: int = 1
     weight_seed: int = 1
     env_seed: int = 1
     general_seed: int = 0
-    N: int = 200
-    bufferLength: int = 30*N
+    N: int = 300
+    bufferLength: int = 6000
     learning_rate: float = 1e-4
     learning_rate_decay: float = 1
     learning_rate_min: float = 1e-5
-    epsilon: float = .01
+    epsilon: float = 1
     epsilon_min: float = 0.01
-    epsilon_decay: float = 1
-    gamma: float = 0.97
+    epsilon_decay: float = 0.999
+    gamma: float = 0.99
     beta: float = 100
     vel_weight: float = .5
-    rewardNormalizationFactor: float = 1
-    TargetUpdateRate: int = 4
+    target_update_rate: int = 4
     batch_size: int = 16
-    theta: float = 0.8
+    theta: float = 1
     T: float = 6*np.pi
-    h: float = 0.2
+    h: float = 0.02
     SampleDelay: int = 3
     InputConnectivity: float = 0.2
-    NormalizationFactor: List[float] = field(default_factory=lambda: [4.8, 3, 0.418, 2])
-    NormalizationOffset: List[float] = field(default_factory=lambda: [4.8, 4, 0.5, 4])
-    amplification: int = 9
-    tau: int = 75
-    fb_gain: float = 0.25
+    rewardNormalizationFactor: float = 1.0
+    NormalizationFactor: List[float] = field(default_factory=list)
+    NormalizationOffset: List[float] = field(default_factory=list)
+    amplification: float = 360.0
+    tau: int = 0
+    fb_gain: float = 0
     tau_N: float = 0.0  # if non-zero, tau is set to tau_N * N
-    trials: int = 10
+    trials: int = 100
     val_size: int = 10
 
+    def __post_init__(self):
+        """This runs right after the object is initialized."""
+        # We use object.__setattr__ because the dataclass is frozen=True
+        if not self.NormalizationFactor or not self.NormalizationOffset:
+            preset = NORM_PRESETS.get(self.env_name, NORM_PRESETS["CartPole-v1"])
+            object.__setattr__(self, "NormalizationFactor", preset["factor"])
+            object.__setattr__(self, "NormalizationOffset", preset["offset"])
 
     def validate(self) -> None:
         if self.N <= 0:
@@ -111,65 +137,66 @@ class DQNConfig:
         return cfg
 
 class DQN_RC:
-    def __init__(self, env, reward_function=None,
+    def __init__(self, env=None, *, reward_function=None, env_name=None, watch=True,
                  config: Optional[DQNConfig | Mapping[str, Any]] = None,
                  model: Optional[str] = None,
                  **overrides: Any) -> None:
         """
         A class that implements a DQN Reservoir Computer for reinforcement learning tasks.
 
+
         Args:
             env (gym.Env): The environment to train the model on.
-            DQNConfig (dict): Hyparameter values
-            Mapping (dict): Hyperparameter values
+            config (DQNConfig | Mapping[str, Any]): Hyperparameter values as a DQNConfig object or a dict. If both `config` and `overrides` are provided, `overrides` takes precedence.
+            model (str): Optional path to a previously trained model to load.
+            env_name (str): Optional name of the environment to create if `env` is not provided. Ignored if `env` is provided. Required if `env` is not provided.
+            watch (bool): If True, render the environment during training. Ignored if `env` is provided, as rendering should be set when creating the environment.
             overrides (dict): Individual hyperparameter values
 
         Attributes:
-            rand (np.random.RandomState): Random number generator with seed.
-            N (int): Number of internal nodes in the reservoir.
             env (gym.Env): The environment to train the model on.
-            bufferLength (int): Length of the memory buffer.
+            config (DQNConfig): Hyperparameter values including defaults, values from `config`, and any overrides.
+            rc_seed (int): Seed for random number generator for reservoir computer.
+            mask_seed (int): Seed for random number generator for input mask.
+            env_seed (int): Seed for random number generator for environment.
+            weight_seed (int): Seed for random number generator for readout weights.
+            rand (np.random.RandomState): Random number generator for reservoir computer.
+            N (int): Number of neurons in the reservoir.
+            theta (float): neuron separation time (relative to natural frequency of reservoir).
             memory (deque): Memory buffer for experience replay.
-            learning_rate (float): Learning rate for training.
-            learning_rate_decay (float): Learning rate decay after each episode.
+            learning_rate (float): Learning rate for training the readout weights.
+            learning_rate_decay (float): Decay factor for learning rate after each episode.
             learning_rate_min (float): Minimum learning rate.
-            epsilon (float): Initial epsilon value for epsilon-greedy policy.
-            epsilon_min (float): Minimum epsilon value.
-            epsilon_decay (float): Decay rate for epsilon.
+            epsilon (float): Initial epsilon for epsilon-greedy policy.
+            epsilon_min (float): Minimum epsilon for epsilon-greedy policy.
+            epsilon_decay (float): Decay factor for epsilon after each episode.
             gamma (float): Discount factor for future rewards.
-            rewardNormalizationFactor (float): Normalization factor for reward.
-            TargetUpdateRate (int): When to update the target method.
-            ClearWhenSampled (bool): Clears memory after each training if True.
-            batch_size (int): Batch size for training.
-            updateCounter (int): Counter of episodes for target model updating.
-            state_shape (tuple): Shape of the gym state space.
-            loss (float): Loss value, squared difference between target and predicted Q-values.
+            trials (int): Number of training trials.
+            val_size (int): Number of episodes to run for validation.
+            target_update_rate (int): Number of trials between updates to the target readout weights.
+            state_shape (tuple): Shape of the environment's observation space.
+            action_shape (int): Number of actions in the environment's action space.
+            reward_function (callable): Optional function for shaping rewards.
+            loss (float): The most recent loss value from training the readout weights.
+            h (float): Integration step size for simulating the reservoir dynamics.
+            tau (int): Time delay for feedback in the reservoir (in number of periods, theta).
+            fb_gain (float): Feedback gain for the reservoir.
+            
 
-            theta (float): Length of one sample of reservoir state [non-dimensional].
-            T (float): Total simulation time for one reservoir state [non-dimensional].
-            h (float): Integration step size.
-            tau (float): unused as of 9/28/2025.
-            T_final (float): Total simulation time for one reservoir state [non-dimensional].
-            SampleDelay (int): How long to wait after input before starting to sample the reservoir state (in number of h steps).
-            MEMS_IC (np.ndarray): MEMS initial conditions (position, velocity).
-            time_array (np.ndarray): Array of simulation time values.
-            MEMS_state (np.ndarray): Current position and velocity of beam.
-            NormalizationFactor (np.ndarray): Normalization divisor for input.
-            NormalizationOffset (np.ndarray): Normalization offset for input.
-            W_internal (np.ndarray): Internal weights of the reservoir.
-            spectralRadius (float): Spectral radius of the internal weights.
-            spectralRadius_after_mod (float): Spectral radius after normalization.
-            spectral_radius_scalar (float): Scalar for spectral radius normalization.
-            W_in (np.ndarray): Input weights of the reservoir.
-            X_int (np.ndarray): unused as of 9/28/2025.
-            Vin (np.ndarray): Input voltage sequence.
-            W_out (np.ndarray): Output weights for the action space.
-            W_out_target (np.ndarray): Target output weights for the action space.
-            MEMS_neurons (np.ndarray): Neuron values based on input to MEMS simulation.
+
 
         """
-        # start from defaults
-        base = DQNConfig()
+        if env is None:
+            mode = None
+            if watch:
+                mode = "human"
+            if env_name is not None:
+                env = gym.make(env_name, render_mode=mode)
+            else:
+                print("Warning: No environment provided. Defaulting to CartPole-v1.")
+                env = gym.make("CartPole-v1", render_mode=mode)
+        self.env_name = env.unwrapped.spec.id
+        base = DQNConfig(env_name=self.env_name)
         # merge user config (dataclass or dict)
         if isinstance(config, DQNConfig):
             base = config
@@ -215,11 +242,11 @@ class DQN_RC:
         self.gamma = self.config.gamma  # discount factor for future rewards
 
         self.rewardNormalizationFactor = self.config.rewardNormalizationFactor  # normalization factor for reward if needed
-        self.TargetUpdateRate = self.config.TargetUpdateRate  # when to update the target method
+        self.target_update_rate = self.config.target_update_rate  # when to update the target method
 
         self.batch_size = self.config.batch_size  # batch size for training
 
-        self.updateCounter = 0  # keep track of episodes for target model updating
+        self.update_counter = 0  # keep track of episodes for target model updating
 
         self.state_shape  = self.env.observation_space.shape
         if self.state_shape is None:
@@ -259,24 +286,6 @@ class DQN_RC:
         if self.config.tau_N != 0:
             self.tau = int(self.config.tau_N * self.N) # craft tau based on N if specified
             print('setting tau based on N: ', self.tau)
-        
-        # hardcoding tau = N+1 for this experiment
-        # self.tau = self.N + 1
-        # print(self.tau)
-
-        self.tau_steps = int(self.tau*jnp.floor(self.theta/self.h))
-        m = self.tau_steps
-        buf_len = max(m+2, 2)
-        # Create tau buffers for feedback
-        self.pos_buf = jnp.full((buf_len,), 0.0, dtype=jnp.float32)
-        self.vel_buf = jnp.full((buf_len,), 0.0, dtype=jnp.float32)
-        self.buf_idx = jnp.int32(0)
-        self.buf_cnt = jnp.int32(0) # buffer count
-        # start everything with IC: x(0) = 0, x_dot(0) = 0
-
-        self.time_array = np.array([0])  # start with initial time of zero
-        self.MEMS_state = np.array([[0.0, 0.0]])  # initialize the array of MEMS state array (stores the MEMS dynamical response)
-
 
         self.NormalizationFactor = self.config.NormalizationFactor
         self.NormalizationOffset = self.config.NormalizationOffset
@@ -324,11 +333,22 @@ class DQN_RC:
         
         self.W_out_target = self.W_out.copy()
     
-    def zero_reservoir(self):
-        self.reservoir.zero_reservoir()
-
-    
     def readout(self, neurons, W_out, *, analyze=False):
+        """
+        Calculates the best action based on neuron activity and weights.
+
+        Args:
+            neurons (np.ndarray): The current state/activity of the neurons.
+            W_out (np.ndarray): Weight matrix for the output layer.
+            analyze (bool): If True, returns the full list of Q-values calculated.
+
+        Returns:
+            high_Q (float): The maximum Q-value found.
+            action (int): The index of the winning action.
+            Q_vals (list[float] | None): A list of all Q-values if `analyze` 
+            is True, otherwise None.
+        """
+        
         high_Q = float('-inf')
         Q_vals = np.array([])
         for i in range(W_out.shape[1]):
@@ -366,15 +386,17 @@ class DQN_RC:
 
     def act(self, state, opt=False, *, analyze=False):
         """
-        Run the reservoir computer to get action and apply epsilon-greedy policy.
-
+        Run the reservoir computer to find next action and apply epsilon-greedy policy.
 
         Args:
             state (np.ndarray): Current state of the environment.
+            opt (bool): If True, applies epsilon-greedy policy and decays epsilon.
+            analyze (bool): If True, returns the full list of Q-values calculated.
 
         Returns:
             action (int): Chosen action.
-           neurons (np.ndarray): Reservoir neurons state including input feedback.
+            neurons (np.ndarray): Reservoir neurons state including input feedback.
+            Q_vals (list[float] | None): A list of all Q-values if `analyze` is True, otherwise None.
         """
         if opt:
             self.epsilon *= self.epsilon_decay
@@ -401,13 +423,14 @@ class DQN_RC:
 
     def remember(self, action, reward, done, neurons, future_neurons):
         """
-        Add experience to the memory buffer for experience replay-based training.
+        Add experience (action, reward, done, neurons, future_neurons) to the memory buffer 
+        for experience replay-based training.
         """
         self.memory.append([action, reward, done, neurons, future_neurons])
 
     def replay(self):
         """
-        Run training based on a batch of experiences from memory.
+        Optimizes readouts based on a batch of experiences from memory.
 
         1. Takes a random batch of experiences from memory.
         2. For each experience, runs target reservoir computer to get target Q-value.
@@ -449,10 +472,10 @@ class DQN_RC:
 
 
         # Update target network every few episodes
-        self.updateCounter = self.updateCounter+1
+        self.update_counter = self.update_counter+1
 
 
-        if(self.updateCounter%self.TargetUpdateRate == 0):
+        if(self.update_counter%self.target_update_rate == 0):
           self.W_out_target = self.W_out.copy()
 
 
@@ -467,7 +490,7 @@ class DQN_RC:
         trial_loss = 0
         tot_neuron_sat = 0
 
-        self.zero_reservoir()
+        self.reservoir.zero_reservoir()
         action, neurons, _= self.act(obs, opt)
         
         while not done:
@@ -506,11 +529,10 @@ class DQN_RC:
         return returns
 
 
-    def train(self, *, env=None, meta, trials=None, 
-              folder_path=None, wandb_on=True, save_model=True,
+    def train(self, *, env=None, meta={}, trials=None, 
+              folder_path=None, wandb_on=False, save_model=True,
               ray_on=False, ray_metric='avg_reward', ray_mode='max',
-              ray_report_freq=1, full_validate=True, val_size_min=1, threed_it=False):
-        self.env_name = meta['env'] if 'env' in meta else 'unknown_env'
+              ray_report_freq=1, full_validate=False, val_size_min=1, threed_it=False):
         
         if ray_on:
             try:
@@ -533,12 +555,13 @@ class DQN_RC:
         required_fields = ["project", "group", "job_type", "run_name", "tags"]
         for field in required_fields:
             if field not in meta:
-                meta[field] = "not_provided"
+                meta[field] = f"{field}_dne"
         self.run_name = meta["run_name"]
         if folder_path is not None:
             self.folder_path = folder_path
         elif save_model:
-            raise ValueError("A folder path is required for saving models during training")
+            print("Warning: No folder provided. Model will be saved to 'train_dqn-rc' in current directory.")
+            self.folder_path = 'train_dqn-rc'
         
         if ray_on and ray_metric is None:
             ray_metric = 'avg_reward'
@@ -582,7 +605,12 @@ class DQN_RC:
             total_reward = returns["total_reward"]
             trial_length = returns["trial_length"]
 
-            
+            def call_save(folder_path, meta):
+                folder_path = folder_path if folder_path is not None else f"DQN_RC/models/{self.env_name},{meta['group'] if 'group' in meta else 'nogroup'}"
+                os.makedirs(folder_path, exist_ok=True)
+                best_model_path = f"{folder_path}/{self.run_name}.npz"
+                self.save_reservoir(best_model_path)
+                return best_model_path
             
             val_time_start = time.time_ns()
             if full_validate or ray_on:
@@ -592,10 +620,7 @@ class DQN_RC:
                         print(f'New best reward: {val_results["avg_reward"]}')
                     best_avg_reward = val_results['avg_reward']
                     if save_model and not ray_on:
-                        folder_path = folder_path if folder_path is not None else f"DQN_RC/models/{meta['env']},{meta['group']}"
-                        os.makedirs(folder_path, exist_ok=True)
-                        best_model_path = f"{folder_path}/{meta['run_name']}.npz"
-                        self.save_reservoir(best_model_path)
+                        best_model_path = call_save(folder_path, meta)
             elif total_reward > .9*best_avg_reward or total_reward > 1.1*best_avg_reward: # validate fully if reward is close to best
                 print('sampling')
                 val_results = self.validate()
@@ -603,15 +628,13 @@ class DQN_RC:
                     print(f'New best reward: {val_results["avg_reward"]}')
                     best_avg_reward = val_results['avg_reward']
                     if save_model and not ray_on:
-                        folder_path = folder_path if folder_path is not None else f"DQN_RC/models/{meta['env']},{meta['group']}"
-                        os.makedirs(folder_path, exist_ok=True)
-                        best_model_path = f"{folder_path}/{meta['run_name']}.npz"
-                        self.save_reservoir(best_model_path)
+                        best_model_path = call_save(folder_path, meta)
             else: # if full_validation is false and not close to best, validate for val_size_min
                 val_results = self.validate(val_size=val_size_min)
 
             val_time = time.time_ns() - val_time_start
 
+            
             
             if threed_it:
                 from analyze.analyze_run import AnalyzeRun
@@ -720,7 +743,7 @@ class DQN_RC:
         trial_lengths = []
         trial_losses = []
 
-        self.zero_reservoir()
+        self.reservoir.zero_reservoir()
 
         if val_size is None:
             val_size = self.val_size

@@ -9,8 +9,8 @@ Description:
 
     It is built with JAX, specifically JIT compilation, for speed.
 
-    It should be able to handle any given DDE equation with possibly some
-    input changes.
+    It should be able to handle any given DDE equation written in the proper
+    JAX format.
 """
 
 OMP_NUM_THREADS=1
@@ -32,8 +32,8 @@ from io import BytesIO
 
 class Reservoir:
     def __init__(self, *, h=.02, theta, N, sd=0, amp=1, tau=0, fb_gain=0, 
-                 norm_factor=None, norm_offset=None, state_shape=None,
-                 input_connectivity=None, mask=None, mask_seed=0,
+                 norm_factor=None, norm_offset=None, state_shape=1,
+                 input_connectivity=0.2, mask=None, mask_seed=0,
                  load=False, normalize_mask=True, VDC=20):
 
         self.h = h

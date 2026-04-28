@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hardware_rc"
-version = "0.2.6"
+version = "0.2.7"
 authors = [
   { name="Andrew Carr", email="andrewcarr319@gmail.com" },
 ]
@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com"
+"Homepage" = "https://andrewpatcarr.github.io/hardware_reservoir_computing"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hardware_rc"]
