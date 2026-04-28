@@ -14,6 +14,10 @@ Description:
     environment from Farama Gymnasium, previously trained models, and 
     singular or specific hyperparameter values.
 """
+
+
+__all__ = ["DQN_RC", ]
+
 import os, multiprocessing as mp
 
 OMP_NUM_THREADS=1
@@ -333,7 +337,7 @@ class DQN_RC:
         
         self.W_out_target = self.W_out.copy()
     
-    def readout(self, neurons, W_out, *, analyze=False):
+    def _readout(self, neurons, W_out, *, analyze=False):
         """
         Calculates the best action based on neuron activity and weights.
 
@@ -345,8 +349,7 @@ class DQN_RC:
         Returns:
             high_Q (float): The maximum Q-value found.
             action (int): The index of the winning action.
-            Q_vals (list[float] | None): A list of all Q-values if `analyze` 
-            is True, otherwise None.
+            Q_vals (list[float] | None): A list of all Q-values if `analyze` is True, otherwise None.
         """
         
         high_Q = float('-inf')
@@ -411,7 +414,7 @@ class DQN_RC:
 
         self.MEMS_neurons = np.array(neuron_vals).reshape(1, -1)          # shape (N, 1)
 
-        _, action, Q_vals = self.readout(self.MEMS_neurons, self.W_out, analyze=analyze)
+        _, action, Q_vals = self._readout(self.MEMS_neurons, self.W_out, analyze=analyze)
 
         if opt:
             if self.rand.random() < self.epsilon:
@@ -435,7 +438,6 @@ class DQN_RC:
         1. Takes a random batch of experiences from memory.
         2. For each experience, runs target reservoir computer to get target Q-value.
         3. Trains the readout matrix (optimize) depending on what action the actual model took.
-          - Gets actual Q-Values by multiplying neuron states,neurons, with readout weights.
 
         """
 
@@ -457,7 +459,7 @@ class DQN_RC:
                 target = reward/self.rewardNormalizationFactor
                 # print(f'target: {target}, normfactor: {self.rewardNormalizationFactor}')
             else:
-                Q_future = self.readout(future_neurons, self.W_out_target)[0]
+                Q_future = self._readout(future_neurons, self.W_out_target)[0]
                 target = (reward + Q_future * self.gamma)/self.rewardNormalizationFactor
                 # print(f'target: {target}, normfactor: {self.rewardNormalizationFactor}')
 
