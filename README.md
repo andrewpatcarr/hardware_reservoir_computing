@@ -1,7 +1,7 @@
 hardware-rc
 ---
 
-**A package for simulating hardware dynamics and training a single-node reservoir computer.**
+**A package for simulating hardware dynamics and training readouts of a single-node reservoir computer.**
 
 ### Includes:
 - built-in algorithms for training on Gymnasium environments
